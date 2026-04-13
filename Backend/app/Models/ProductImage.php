@@ -12,6 +12,5 @@ class ProductImage extends Model
     protected $fillable = [
         'product_id',
         'pathToImage',
-        'is_main_image',
     ];
 }

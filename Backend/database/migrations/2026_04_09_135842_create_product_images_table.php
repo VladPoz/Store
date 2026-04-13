@@ -17,7 +17,6 @@ return new class extends Migration
             ->onUpdate('cascade')
             ->onDelete('cascade');
             $table->string('pathToImage');
-            $table->integer('is_main_image');
         });
     }
 

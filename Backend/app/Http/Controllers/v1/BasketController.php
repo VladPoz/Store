@@ -11,21 +11,18 @@ class BasketController extends Controller
 {
     //
     public function show(){
-        $userId = Auth::user()->id;
-        if(!$userId){
-            return response()->json(['message' => 'user not found'], 404);
-        }
+        $userId = Auth::id();
         $product_id = Basket::query()->where('user_id', $userId)->pluck('product_id');
         if($product_id->isEmpty()){
-            return response()->json(['message' => 'basket empty'], 404);
+            return response()->json([], 200);
         }
-        $baskets = Product::with(['images' => function($value){$value->where('is_main_image', 1);}])->whereIn('id', $product_id)
+        $baskets = Product::query()->whereIn('id', $product_id)
 //            Сделано ИИ!!!
             ->orderByRaw('FIELD(id, ' . $product_id->implode(',') . ')')
 //            Сделано ИИ!!!
             ->get();
-        $basketId = Basket::query()->where('user_id', $userId)->pluck('id');
-        return response()->json([$baskets, $basketId]);
+        $baskets->load('images');
+        return response()->json($baskets, 200);
     }
 
     public function store(string $product_id){
@@ -44,14 +41,8 @@ class BasketController extends Controller
     }
 
     public function destroy(string $id){
-        $user = Auth::user();
-        if(!$user){
-            return response()->json(['message' => 'user not found'], 404);
-        }
-        $basket = Basket::query()->find($id);
-        if(!$basket){
-            return response()->json(['message' => 'basket not found'], 404);
-        }
+        $userId = Auth::id();
+        $basket = Basket::query()->where('user_id', $userId)->where('product_id', $id)->firstOrFail();
         $basket->delete();
         return response()->json(['message' => 'basket deleted'], 200);
     }

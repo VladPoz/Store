@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\v1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Role;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\UserUpdateRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -25,7 +26,7 @@ class UserController extends Controller
     {
         $user = User::query()->find($id);
         if(!$user){
-            return response()->json(["message" => "User not found"], 404);
+            return response()->json('User not found', 404);
         }
         return response()->json($user);
     }
@@ -33,78 +34,54 @@ class UserController extends Controller
     public function profile()
     {
         $user = Auth::user();
-        if(!$user){
-            return response()->json(["message" => "User not found"], 404);
-        }
-
-        $role = Role::query()->where('id', $user->role_id)->first();
-        return response()->json([$user->only(['name', 'email', 'created_at']), $role->role_name]);
+        $user->load('role');
+        return response()->json($user, 200);
     }
 
-    public function register(Request $request)
+    public function register(RegisterRequest $request)
     {
-        $request->validate([
-            'name' => 'required|unique:users|min:3|max:32|string',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:4|max:32',
-        ]);
         $user = User::query()->create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role_id' => 1,
         ]);
-        return response()->json(['token' => $user->createToken('User Token')->plainTextToken]);
+        return response()->json(['token' => $user->createToken('token')->plainTextToken]);
     }
 
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
-        $user = User::query()->where('email', $request->email)->first();
-        if(!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['error' => 'Invalid Email or Password'], 401);
+        if(!Auth::attempt(['email' => $request->email, 'password' => $request->password])){
+            return response()->json(['errors' => ['Invalid Email or Password']], 422);
         }
-        $user->tokens()->delete();
-        return response()->json(['token' => $user->createToken('User Token')->plainTextToken]);
+
+        $user = Auth::user();
+        return response()->json(['token' => $user->createToken('token')->plainTextToken]);
     }
 
     public function logout(){
         $user = Auth::user();
         if(!$user){
-            return response()->json(['error' => 'User not authenticated'], 401);
+            return response()->json(['err' => 'User not authenticated'], 401);
         }
         $user->currentAccessToken()->delete();
         return response()->json(['message' => 'Logged out']);
     }
 
-    public function update(Request $request)
+    public function update(UserUpdateRequest $request)
     {
         $user = Auth::user();
-        if(!$user){
-            return response()->json(['massage' => 'User not authenticated'], 404);
-        }
-        $data = $request->validate([
-            'name' => ['required', 'min:3', 'max:32', 'string', Rule::unique('users')->ignore($user->id)],
-            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'password' => 'required|min:4|max:32',
-        ]);
-        $user->query()->update([
+        $user->update([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
-        return response()->json(['message' => 'Update success']);
+        return response()->json('Update success', 200);
     }
 
     public function destroy()
     {
         $user = Auth::user();
-        if(!$user){
-            return response()->json(['massage' => 'User not authenticated'], 404);
-        }
         $user->delete();
         return response()->json(['massage' => 'Delete success']);
     }
